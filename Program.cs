@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using System.IO;
 
 namespace Zippo
@@ -41,8 +42,10 @@ namespace Zippo
                     dictionary.Add(file[i], value);
                 }
             }
-            Console.WriteLine("Counting successfull complete! Approximate file size: "+size+" bytes");
-            Console.WriteLine("Zipping...");
+            Console.WriteLine("Counting symbols successfull complete! Approximate file size: "+size+" bytes");
+            Console.WriteLine("Counting probabilities...");
+            Dictionary<char, double> probability = new Dictionary<char, double>();
+            foreach(var symbol in dictionary.OrderBy(symbol => symbol.Value)) probability.Add(symbol.Key, symbol.Value / dictionary.Count);
 
             Console.ReadKey();
         }
