@@ -2,34 +2,73 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.IO;
 
 namespace Zippo
 {
     class Program
     {
+        public static Dictionary<char, string> coding;
         static void Main(string[] args)
         {
-            Console.WriteLine("Enter the file path (preferably .txt format and with russians symbols): ");
+            begin: Console.WriteLine("Enter the file path (preferably .txt format and with russians symbols): ");
             string filePath = Console.ReadLine();
-            Console.WriteLine("Reading...");
-            byte[] array;
+            string pattern = @"^[\w]:\/([\w]+\/)?[\w]+\.[\w]{2,5}$";
+            Regex r = new Regex(pattern);
+            if (!r.IsMatch(filePath))
+            {
+                Console.WriteLine("You should write a correct path!");
+                goto begin;
+            }
+            Console.Write("Reading...");
+            string file = "";
             try
             {
-                FileStream stream = new FileStream(filePath, FileMode.Open);
-                array = new byte[(int)stream.Length];
-                stream.Read(array, 0, (int)stream.Length);
+                StreamReader stream = new StreamReader(filePath, Encoding.UTF8);
+                while (!stream.EndOfStream) file += stream.ReadLine();
                 stream.Close();
                 Console.Write("complete!");
+                Console.WriteLine();
+            }
+            catch (FileNotFoundException fe)
+            {
+                Console.WriteLine(fe.Message);
+                goto begin;
             }
             catch
             {
-                Console.WriteLine("Reading complete with errors...");
-                Console.ReadKey();
-                return;
+                Console.WriteLine("Reading finished with errors!");
+                goto begin;
             }
-            string file = Encoding.UTF8.GetString(array);
-            Console.WriteLine("Counting a symbols...");
+            if (file.Substring(0, 8).CompareTo("IVT-142|") == 0)
+            {
+                Console.Write("This file was zipping later. Reading a Huffman codes...");
+                file = file.Substring(8, file.Length - 8);
+                int j, count = 0;
+                string codeBuf = "";
+                char symBuf = 'a';
+                coding = new Dictionary<char, string>();
+                foreach (char symbol in file)
+                {
+                    count++;
+                    if (int.TryParse(symbol.ToString(), out j)) codeBuf += symbol;
+                    else
+                    {
+                        if (codeBuf.Length > 0)
+                        {
+                            coding.Add(symBuf, codeBuf);
+                            codeBuf = "";
+                        }
+                        if (symbol.Equals('<')) break;
+                        symBuf = symbol;
+                    }
+                }
+                file = file.Substring(count, file.Length - count);
+                //continue
+                goto exit;
+            }
+            Console.Write("Counting a symbols...");
             Dictionary<char, int> dictionary = new Dictionary<char, int>();
             for (int i = 0; i < file.Length; ++i)
             {
@@ -37,7 +76,8 @@ namespace Zippo
                 else dictionary.Add(file[i], 1);
             }
             Console.Write("complete!");
-            Console.WriteLine("Creating a Huffman tree...");
+            Console.WriteLine();
+            Console.Write("Creating a Huffman tree...");
             List<HuffmanTreeNode> nodes = new List<HuffmanTreeNode>();
             foreach(KeyValuePair<char, int> p in dictionary)
             {
@@ -48,65 +88,56 @@ namespace Zippo
             }
             while (nodes.Count > 1)
             {
-                nodes = nodes.OrderByDescending(n => n.Weight).ToList();
+                nodes = nodes.OrderBy(n => n.Weight).ToList();
                 HuffmanTreeNode parentNode = new HuffmanTreeNode();
                 parentNode.LeftChild = nodes[0];
-                parentNode.LeftChild.Rotation = '0';
                 parentNode.RightChild = nodes[1];
-                parentNode.RightChild.Rotation = '1';
                 parentNode.Weight = parentNode.LeftChild.Weight + parentNode.RightChild.Weight;
                 nodes.RemoveAt(0);
                 nodes.RemoveAt(0);
                 nodes.Add(parentNode);
             }
             Console.Write("complete!");
-            Console.WriteLine("Creating output file...");
-
+            Console.WriteLine();
+            Console.Write("Creating output file...");
+            string outputPath = "";
+            for (int i = filePath.Count() - 1; i >= 0; i--)
+            {
+                if (filePath[i].CompareTo('.')==0)
+                {
+                    outputPath = filePath.Substring(0, i + 1);
+                    break;
+                }
+            }
+            coding = new Dictionary<char, string>();
+            StreamWriter output = new StreamWriter(outputPath+"_zippo_coding.txt", false, Encoding.UTF8);
+            output.WriteLine("IVT-142|");
+            printHuffmanTree(nodes[0], output);
+            output.WriteLine("<");
+            foreach (char symbol in file) output.Write(coding[symbol]);
+            output.Close();
+            exit:
+            Console.Write("complete!");
+            Console.WriteLine();
             Console.ReadKey();
+        }
+
+        static void printHuffmanTree(HuffmanTreeNode node, StreamWriter output, string code = "")
+        {
+            if (node.LeftChild == null)
+            {
+                string print = node.Symbol /*+ ":" + code.Length + "|"*/ + code;
+                coding.Add(node.Symbol, code);
+                output.WriteLine(print);
+            }
+            if (node.LeftChild != null)
+            {
+                printHuffmanTree(node.LeftChild, output, code+"0");
+            }
+            if (node.RightChild != null)
+            {
+                printHuffmanTree(node.RightChild, output, code+"1");
+            }
         }
     }
 }
-/*
-            List<BiBranch> branches = new List<BiBranch>();
-            foreach (char symbol in probability.Keys)
-            {
-                BiLeaf leaf = new BiLeaf();
-                leaf.symbol = symbol;
-                leaf.nodeLevel = 0;
-                branches.Add(leaf);
-            }
-            int iterator = 0;
-            short levelID = 1, branchID = 1;
-            bool binValue = true;
-            BiBranch newBranch = new BiBranch();
-            foreach (var branch in branches)
-            {
-                if (levelID == 1)
-                {
-                    if (branch.GetType() == typeof(BiLeaf))
-                    {
-                        if (branchID < 3)
-                        {
-                            branch.lastBranch = newBranch;
-                            branchID++;
-                        }
-                        else
-                        {
-                            //branches.Add(newBranch);
-                            newBranch = new BiBranch();
-                            branchID = 1;
-                        }
-                        iterator++;
-                    }
-                    else
-                    {
-
-                    }
-                }
-                else
-                {
-
-                }
-
-            }
-*/

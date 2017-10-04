@@ -18,6 +18,5 @@ namespace Zippo
         public HuffmanTreeNode LeftChild { get; set; }
         public HuffmanTreeNode RightChild { get; set; }
         public int Weight { get; set; }
-        public char Rotation { get; set; }
     }
 }
