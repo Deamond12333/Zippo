@@ -10,9 +10,12 @@ namespace Zippo
     class Program
     {
         public static Dictionary<char, string> coding;
+        public static StreamWriter output;
         static void Main(string[] args)
         {
-            begin: Console.WriteLine("Enter the file path (preferably .txt format and with russians symbols): ");
+            begin:
+            Console.WriteLine("Enter the file path (preferably .txt format and with russians symbols): ");
+
             string filePath = Console.ReadLine();
             string pattern = @"^[\w]:\/([\w]+\/)?[\w]+\.[\w]{2,5}$";
             Regex r = new Regex(pattern);
@@ -21,7 +24,9 @@ namespace Zippo
                 Console.WriteLine("You should write a correct path!");
                 goto begin;
             }
+
             Console.Write("Reading...");
+
             string file = "";
             try
             {
@@ -41,6 +46,17 @@ namespace Zippo
                 Console.WriteLine("Reading finished with errors!");
                 goto begin;
             }
+
+            string outputPath = "";
+            for (int i = filePath.Count() - 1; i >= 0; i--)
+            {
+                if (filePath[i].CompareTo('.') == 0)
+                {
+                    outputPath = filePath.Substring(0, i);
+                    break;
+                }
+            }
+
             if (file.Substring(0, 8).CompareTo("IVT-142|") == 0)
             {
                 Console.Write("This file was zipping later. Reading a Huffman codes...");
@@ -52,9 +68,12 @@ namespace Zippo
                 foreach (char symbol in file)
                 {
                     count++;
-                    if (int.TryParse(symbol.ToString(), out j)) codeBuf += symbol;
-                    else
+                    if (int.TryParse(symbol.ToString(), out j) && (j == 0 || j == 1))
                     {
+                        codeBuf += symbol;
+                    }
+                    else
+                    { 
                         if (codeBuf.Length > 0)
                         {
                             coding.Add(symBuf, codeBuf);
@@ -65,19 +84,51 @@ namespace Zippo
                     }
                 }
                 file = file.Substring(count, file.Length - count);
-                //continue
+                coding = coding.OrderBy(o => o.Value.Length).ToDictionary(p => p.Key, t => t.Value);
+
+                Console.Write("complete!");
+                Console.WriteLine();
+                Console.Write("Decoding a bits...");
+
+                int l = 0;
+                while (l < file.Length)
+                {
+                    foreach (KeyValuePair<char, string> p in coding)
+                    {
+                        try
+                        {
+                            if (file.Substring(l, p.Value.Length).CompareTo(p.Value) == 0)
+                            {
+                                file = file.Substring(0, l) + p.Key + file.Substring(l + p.Value.Length);
+                                l++;
+                            }
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            continue;
+                        }
+                    }
+                }
+
+                output = new StreamWriter(outputPath + "_zippo_decoding.txt", false, Encoding.UTF8);
+                output.Write(file);
+                output.Close();
                 goto exit;
             }
+
             Console.Write("Counting a symbols...");
+
             Dictionary<char, int> dictionary = new Dictionary<char, int>();
             for (int i = 0; i < file.Length; ++i)
             {
                 if (dictionary.ContainsKey(file[i])) dictionary[file[i]]++;
                 else dictionary.Add(file[i], 1);
             }
+
             Console.Write("complete!");
             Console.WriteLine();
             Console.Write("Creating a Huffman tree...");
+
             List<HuffmanTreeNode> nodes = new List<HuffmanTreeNode>();
             foreach(KeyValuePair<char, int> p in dictionary)
             {
@@ -86,6 +137,7 @@ namespace Zippo
                 node.Weight = p.Value;
                 nodes.Add(node);
             }
+
             while (nodes.Count > 1)
             {
                 nodes = nodes.OrderBy(n => n.Weight).ToList();
@@ -97,25 +149,19 @@ namespace Zippo
                 nodes.RemoveAt(0);
                 nodes.Add(parentNode);
             }
+
             Console.Write("complete!");
             Console.WriteLine();
             Console.Write("Creating output file...");
-            string outputPath = "";
-            for (int i = filePath.Count() - 1; i >= 0; i--)
-            {
-                if (filePath[i].CompareTo('.')==0)
-                {
-                    outputPath = filePath.Substring(0, i + 1);
-                    break;
-                }
-            }
+
             coding = new Dictionary<char, string>();
-            StreamWriter output = new StreamWriter(outputPath+"_zippo_coding.txt", false, Encoding.UTF8);
+            output = new StreamWriter(outputPath+"_zippo_encoding.txt", false, Encoding.UTF8);
             output.WriteLine("IVT-142|");
             printHuffmanTree(nodes[0], output);
             output.WriteLine("<");
             foreach (char symbol in file) output.Write(coding[symbol]);
             output.Close();
+
             exit:
             Console.Write("complete!");
             Console.WriteLine();
@@ -130,14 +176,8 @@ namespace Zippo
                 coding.Add(node.Symbol, code);
                 output.WriteLine(print);
             }
-            if (node.LeftChild != null)
-            {
-                printHuffmanTree(node.LeftChild, output, code+"0");
-            }
-            if (node.RightChild != null)
-            {
-                printHuffmanTree(node.RightChild, output, code+"1");
-            }
+            if (node.LeftChild != null) printHuffmanTree(node.LeftChild, output, code+"0");
+            if (node.RightChild != null) printHuffmanTree(node.RightChild, output, code+"1");
         }
     }
 }
